@@ -10,8 +10,10 @@ module o_buft_ds_primitive_inst (
 
   wire O_P;
   wire O_N;
-  wire latch_out1;
-  wire latch_out2;
+  reg O_P_reg;
+  reg O_N_reg;
+  reg latch_out1;
+  reg latch_out2;
 
   O_BUFT_DS O_BUFT_DS_primitive (
     .I(latch_out1),
@@ -22,6 +24,8 @@ module o_buft_ds_primitive_inst (
 
   assign O_P_O_BUFT_DS = O_P;
   assign O_N_O_BUFT_DS = O_N;
+  assign O_P = (en1) ? 1'b0 : O;
+  assign O_N = (en2) ? 1'b0 : O;
 
   always @(d1, en1) begin
     if (en1) begin
@@ -35,6 +39,10 @@ module o_buft_ds_primitive_inst (
       latch_out2 <= d2; end
     else begin
       latch_out2 <= latch_out2; end
+  end
+
+  always @* begin
+    O_reg = O;
   end
 
 endmodule
