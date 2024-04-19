@@ -10,8 +10,6 @@ module o_buft_ds_primitive_inst (
 
   wire O_P;
   wire O_N;
-  reg O_P_reg;
-  reg O_N_reg;
   reg latch_out1;
   reg latch_out2;
 
