@@ -1,65 +1,58 @@
+ 
 module co_sim_o_buft_ds_primitive_inst;
-    wire 		O_N_O_BUFT_DS	,	O_N_O_BUFT_DS_netlist;
-    wire 		O_P_O_BUFT_DS	,	O_P_O_BUFT_DS_netlist;
-    reg 		T_O_BUFT_DS;
-    reg 		d1;
-    reg 		d2;
-    reg 		en1;
-    reg 		en2;
-	integer		mismatch	=	0;
+  reg I_O_BUFT_DS; // Data input
+  reg T_O_BUFT_DS; // Tri-state output
+  wire O_P_O_BUFT_DS;  // Data positive output (connect to top-level port)
+  wire O_N_O_BUFT_DS; // Data negative output (connect to top-level port)
 
-o_buft_ds_primitive_inst	golden (.*);
+  wire expected_data_output_P, expected_data_output_N;
+o_buft_ds_primitive_inst DUT (.*);
 
-`ifdef PNR
-	o_buft_ds_primitive_inst_post_route route_net (.*, .O_N_O_BUFT_DS(O_N_O_BUFT_DS_netlist), .O_P_O_BUFT_DS(O_P_O_BUFT_DS_netlist) );
-`else
-	o_buft_ds_primitive_inst_post_synth synth_net (.*, .O_N_O_BUFT_DS(O_N_O_BUFT_DS_netlist), .O_P_O_BUFT_DS(O_P_O_BUFT_DS_netlist) );
-`endif
+integer mismatch=0;
 
-// Initialize values to zero 
-initial	begin
-	{T_O_BUFT_DS, d1, d2, en1, en2 } <= 'd0;
-	#50;
-	compare();
-// Generating random stimulus 
-	for (int i = 0; i < 100; i = i + 1) begin
-		T_O_BUFT_DS <= $random();
-		d1 <= $random();
-		d2 <= $random();
-		en1 <= $random();
-		en2 <= $random();
-		#50;
-		compare();
-	end
-
-	// ----------- Corner Case stimulus generation -----------
-	T_O_BUFT_DS <= 1;
-	d1 <= 1;
-	d2 <= 1;
-	en1 <= 1;
-	en2 <= 1;
-	compare();
-	#50;
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+initial begin
+  {I_O_BUFT_DS, T_O_BUFT_DS} = 2'b00;
+  #5
+  compare;
+  {I_O_BUFT_DS, T_O_BUFT_DS} = 2'b01;
+  #5
+  compare;
+  {I_O_BUFT_DS, T_O_BUFT_DS} = 2'b10;
+  #5
+  compare;
+  {I_O_BUFT_DS, T_O_BUFT_DS} = 2'b11;
+  #5
+  compare;
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-task compare();
-	if ( O_N_O_BUFT_DS !== O_N_O_BUFT_DS_netlist	||	O_P_O_BUFT_DS !== O_P_O_BUFT_DS_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", O_N_O_BUFT_DS, O_P_O_BUFT_DS, O_N_O_BUFT_DS_netlist, O_P_O_BUFT_DS_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", O_N_O_BUFT_DS, O_P_O_BUFT_DS, O_N_O_BUFT_DS_netlist, O_P_O_BUFT_DS_netlist,  $time);
+assign expected_data_output_P =  T_O_BUFT_DS ? I_O_BUFT_DS : 1'bz;
+assign expected_data_output_N =  T_O_BUFT_DS ? ~I_O_BUFT_DS : 1'bz;
+
+task compare;
+ 	
+  	if(O_P_O_BUFT_DS !== expected_data_output_P) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output_P, O_P_O_BUFT_DS, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output_P ,O_P_O_BUFT_DS, $time);
+
+    if(O_N_O_BUFT_DS !== expected_data_output_N) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output_N, O_N_O_BUFT_DS, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output_N ,O_N_O_BUFT_DS, $time);
+
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

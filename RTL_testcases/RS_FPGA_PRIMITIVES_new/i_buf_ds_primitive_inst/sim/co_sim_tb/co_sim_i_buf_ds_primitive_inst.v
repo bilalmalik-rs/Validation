@@ -1,74 +1,71 @@
+ 
+ 
 module co_sim_i_buf_ds_primitive_inst;
-// Clock signals
-    reg clk;
-// Reset signals
-    reg enable_output;
+  reg data_positive_input;    // Data positive input (connect to top-level port)
+  reg data_negative_input;    // Data negative input (connect to top-level port)
+  reg enable_input;           // Enable the input
+  wire data_output;           // Data output
 
-    reg 		data_negative_input;
-    wire 		data_output	,	data_output_netlist;
-    reg 		data_positive_input;
-    reg 		enable_input;
-	integer		mismatch	=	0;
+  reg expected_data_output;
+i_buf_ds_primitive_inst DUT (.*);
 
-i_buf_ds_primitive_inst	golden (.*);
+integer mismatch=0;
 
-`ifdef PNR
-	i_buf_ds_primitive_inst_post_route route_net (.*, .data_output(data_output_netlist) );
-`else
-	i_buf_ds_primitive_inst_post_synth synth_net (.*, .data_output(data_output_netlist) );
-`endif
-
-//clock initialization for clk
-    initial begin
-        clk = 1'b0;
-        forever #5 clk = ~clk;
-    end
-//Reset Stimulus generation
 initial begin
-	enable_output <= 0;
-	@(negedge clk);
-	{data_negative_input, data_positive_input, enable_input } <= 'd0;
-	enable_output <= 1;
-	@(negedge clk);
-	$display ("***Reset Test is applied***");
-	@(negedge clk);
-	@(negedge clk);
-	compare();
-	$display ("***Reset Test is ended***");
-	//Random stimulus generation
-	repeat(100) @ (negedge clk) begin
-		data_negative_input 		 <= $random();
-		data_positive_input 		 <= $random();
-		enable_input 		 <= $random();
-		compare();
-end
-
-	// ----------- Corner Case stimulus generation -----------
-	data_negative_input <= 1;
-	data_positive_input <= 1;
-	enable_input <= 1;
-	compare();
-
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	repeat(50) @(posedge clk);
+  {data_positive_input, data_negative_input , enable_input} = 3'b000;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b001;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b010;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b011;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b100;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b101;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b110;
+  #5
+  compare;
+  {data_positive_input, data_negative_input , enable_input} = 3'b111;
+  #5
+  compare;
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-task compare();
-	if ( data_output !== data_output_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, Netlist Output %0d, Time: %0t ", data_output, data_output_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, Netlist Output %0d, Time: %0t ", data_output, data_output_netlist,  $time);
+///model////
+always @(data_positive_input, data_negative_input, enable_input) begin
+    casez ({data_positive_input, data_negative_input, enable_input})
+      3'b??0 : expected_data_output = 0;      // When not enabled, output is set to zero
+      3'b101 : expected_data_output = 1;
+      3'b011 : expected_data_output = 0;
+      default : begin end  // If enabled and I_P and I_N are the same, output does not change
+    endcase
+  end
+
+task compare;
+ 	
+  	if(data_output !== expected_data_output) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output, data_output, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output ,data_output, $time);
+
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

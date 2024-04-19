@@ -1,71 +1,69 @@
+ 
 module co_sim_dffre_primitive_inst;
-// Clock signals
-    reg clock;
-// Reset signals
-    reg reset;
+  reg data_input;    // Data Input
+  reg reset;         // Active-low, asynchronous reset
+  reg enable;        // Active-high enable
+  reg clock;         // Clock
+  wire data_output;
 
-    reg 		data_input;
-    wire 		data_output	,	data_output_netlist;
-    reg 		enable;
-	integer		mismatch	=	0;
+  reg expected_out;
 
-dffre_primitive_inst	golden (.*);
+  dffre_primitive_inst DUT (.*);
 
-`ifdef PNR
-	dffre_primitive_inst_post_route route_net (.*, .data_output(data_output_netlist) );
-`else
-	dffre_primitive_inst_post_synth synth_net (.*, .data_output(data_output_netlist) );
-`endif
+integer mismatch=0;
 
-//clock initialization for clock
-    initial begin
-        clock = 1'b0;
-        forever #5 clock = ~clock;
-    end
-//Reset Stimulus generation
+always #5 clock = ~clock;
 initial begin
-	reset <= 0;
-	@(negedge clock);
-	{data_input, enable } <= 'd0;
-	reset <= 1;
-	@(negedge clock);
-	$display ("***Reset Test is applied***");
-	@(negedge clock);
-	@(negedge clock);
-	compare();
-	$display ("***Reset Test is ended***");
-	//Random stimulus generation
-	repeat(100) @ (negedge clock) begin
-		data_input 		 <= $random();
-		enable 		 <= $random();
-		compare();
-end
-
-	// ----------- Corner Case stimulus generation -----------
-	data_input <= 1;
-	enable <= 1;
-	compare();
-
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	repeat(50) @(posedge clock);
+  clock = 0;
+  reset = 0;
+  enable = 0;
+  data_input = 0;
+  repeat (5) @(negedge clock);
+  reset = 1;
+  compare;
+  repeat (5) @(negedge clock);
+  enable = 0;
+  data_input = 1;
+  compare;
+  @(negedge clock);
+  enable = 1;
+  data_input = 1;
+  compare;
+  @(negedge clock);
+  enable = 0;
+  data_input = 1;
+  compare;
+  @(negedge clock);
+  reset = 0;
+  enable = 1;
+  data_input = 1;
+  compare;
+  repeat (5) @(negedge clock);
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-task compare();
-	if ( data_output !== data_output_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, Netlist Output %0d, Time: %0t ", data_output, data_output_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, Netlist Output %0d, Time: %0t ", data_output, data_output_netlist,  $time);
+ always @(posedge clock, negedge reset)
+    if (!reset)
+      expected_out <= 1'b0;
+    else if (enable)
+      expected_out <= data_input;
+
+task compare;
+ 	
+  	if(data_output !== expected_out) begin
+    	$display("Data Mismatch. Expected out : %0b, Netlist: %0b, Time: %0t", expected_out, data_output, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected out : %0b, Netlist: %0b, Time: %0t", expected_out ,data_output, $time);
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

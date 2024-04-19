@@ -1,125 +1,120 @@
+ 
 module co_sim_TDP_RAM36K_primitive_inst;
-// Clock signals
-    reg CLK_A;
-    reg CLK_B;
-    reg 		[31:0] 		WDATA_B;
-    reg 		[31:0] 		WDATA_A;
-    wire 		[31:0] 		RDATA_A	,	RDATA_A_netlist;
-    wire 		[31:0] 		RDATA_B	,	RDATA_B_netlist;
-    reg 		[14:0] 		ADDR_B;
-    reg 		[14:0] 		ADDR_A;
-    reg 		REN_A;
-    reg 		REN_B;
-    reg 		WEN_A;
-    reg 		WEN_B;
-	integer		mismatch	=	0;
+   reg WEN_A; // Write-enable port A
+  reg WEN_B; // Write-enable port B
+  reg REN_A; // Read-enable port A
+  reg REN_B; // Read-enable port B
+  reg CLK_A; // Clock port A
+  reg CLK_B; // Clock port B
+  reg [14:0] ADDR_A; // Address port A, align MSBs and connect unused MSBs to logic 0
+  reg [14:0] ADDR_B; // Address port B, align MSBs and connect unused MSBs to logic 0
+  reg [31:0] WDATA_A; // Write data port A
+  reg [31:0] WDATA_B; // Write data port B
+  wire [31:0] RDATA_A; // Read data port A
+  wire [31:0] RDATA_B; // Read data port B
 
-TDP_RAM36K_primitive_inst	golden (.*);
+reg [31:0] RDATA_A_expected;
+reg [31:0] RDATA_B_expected;
 
 `ifdef PNR
-	TDP_RAM36K_primitive_inst_post_route route_net (.*, .RDATA_A(RDATA_A_netlist), .RDATA_B(RDATA_B_netlist) );
 `else
-	TDP_RAM36K_primitive_inst_post_synth synth_net (.*, .RDATA_A(RDATA_A_netlist), .RDATA_B(RDATA_B_netlist) );
+   	TDP_RAM36K_primitive_inst DUT (.*);
 `endif
+integer mismatch=0,i;
 
-//clock initialization for CLK_A
-    initial begin
-        CLK_A = 1'b0;
-        forever #5 CLK_A = ~CLK_A;
-    end
-//clock initialization for CLK_B
-    initial begin
-        CLK_B = 1'b0;
-        forever #5 CLK_B = ~CLK_B;
-    end
-// Initialize values to zero 
-initial	begin
-	{WDATA_B, WDATA_A, ADDR_B, ADDR_A, REN_A, REN_B, WEN_A, WEN_B } <= 'd0;
-	 repeat (2) @ (negedge CLK_A); 
-	compare();
-	//Random stimulus generation
-	repeat(100) @ (negedge CLK_A) begin
-		WDATA_B <= $random();
-		WDATA_A <= $random();
-		ADDR_B <= $random();
-		ADDR_A <= $random();
-		REN_A <= $random();
-		REN_B <= $random();
-		WEN_A <= $random();
-		WEN_B <= $random();
 
-		compare();
-	end
+always #10 CLK_A = ~CLK_A;
+always #5 CLK_B = ~CLK_B;
 
-	// ----------- Corner Case stimulus generation -----------
-	WDATA_B <= 4294967295;
-	WDATA_A <= 4294967295;
-	ADDR_B <= 32767;
-	ADDR_A <= 32767;
-	REN_A <= 1;
-	REN_B <= 1;
-	WEN_A <= 1;
-	WEN_B <= 1;
-	repeat (2) @ (negedge CLK_A);
-	compare();
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+initial begin
+  WEN_A <= 0; // Write-enable port A
+  WEN_B <= 0; // Write-enable port B
+  REN_A <= 0; // Read-enable port A
+  REN_B <= 0; // Read-enable port B
+  CLK_A <= 0; // Clock port A
+  CLK_B <= 0; // Clock port B
+  ADDR_A <= 0; // Address port A, align MSBs and connect unused MSBs to logic 0
+  ADDR_B <= 0; // Address port B, align MSBs and connect unused MSBs to logic 0
+  WDATA_A <= 0; // Write data port A
+  WDATA_B <= 0; 
+  for (i = 0 ; i<500 ; i=i+1) begin
+    WEN_A <= $urandom; 
+    WEN_B <= $urandom; 
+    REN_A <= $urandom; 
+    REN_B <= $urandom;     
+    ADDR_A <= $urandom_range(0,512); 
+    ADDR_B <= $urandom_range(513,1023); 
+    WDATA_A <= $urandom; 
+    WDATA_B <= $urandom; 
+    @ (negedge CLK_A);
+    compare;
+  end
+  for (i = 0 ; i<500 ; i=i+1) begin
+    WEN_A <= $urandom; 
+    WEN_B <= $urandom; 
+    REN_A <= $urandom; 
+    REN_B <= $urandom;     
+    ADDR_B <= $urandom_range(0,512); 
+    ADDR_A <= $urandom_range(513,1023); 
+    WDATA_A <= $urandom; 
+    WDATA_B <= $urandom; 
+    @ (negedge CLK_A);
+    compare;
+  end
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-// Initialize values to zero 
-initial	begin
-	{WDATA_B, WDATA_A, ADDR_B, ADDR_A, REN_A, REN_B, WEN_A, WEN_B } <= 'd0;
-	 repeat (2) @ (negedge CLK_B); 
-	compare();
-	//Random stimulus generation
-	repeat(100) @ (negedge CLK_B) begin
-		WDATA_B <= $random();
-		WDATA_A <= $random();
-		ADDR_B <= $random();
-		ADDR_A <= $random();
-		REN_A <= $random();
-		REN_B <= $random();
-		WEN_A <= $random();
-		WEN_B <= $random();
+//memory behaviour
+reg [31:0] memory [1023:0];
+always @(posedge CLK_A)
+  begin
+      
+      if (WEN_A) begin
+          memory[ADDR_A] <= WDATA_A;
+      end
+      if(REN_A)
+          if (WEN_A)
+              RDATA_A_expected = WDATA_A;
+          else
+              RDATA_A_expected = memory[ADDR_A];
+  end
+always @(posedge CLK_B)
+  begin
+      if (WEN_B) begin
+          memory[ADDR_B] <= WDATA_B;
+      end
+      if(REN_B)
+          if (WEN_B)
+              RDATA_B_expected = WDATA_B;
+          else
+              RDATA_B_expected = memory[ADDR_B];
+          
+  end
 
-		compare();
-	end
+task compare;
+ 	
+  	if(RDATA_A !== RDATA_A_expected) begin
+    	$display("Data Mismatch. Expected Out : %0b, Netlist: %0b, Time: %0t", RDATA_A_expected, RDATA_A, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected Out : %0b, Netlist: %0b, Time: %0t", RDATA_A_expected ,RDATA_A, $time);
 
-	// ----------- Corner Case stimulus generation -----------
-	WDATA_B <= 4294967295;
-	WDATA_A <= 4294967295;
-	ADDR_B <= 32767;
-	ADDR_A <= 32767;
-	REN_A <= 1;
-	REN_B <= 1;
-	WEN_A <= 1;
-	WEN_B <= 1;
-	repeat (2) @ (negedge CLK_B);
-	compare();
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
-	$finish;
-end
 
-task compare();
-	if ( RDATA_A !== RDATA_A_netlist	||	RDATA_B !== RDATA_B_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", RDATA_A, RDATA_B, RDATA_A_netlist, RDATA_B_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", RDATA_A, RDATA_B, RDATA_A_netlist, RDATA_B_netlist,  $time);
+    if(RDATA_B !== RDATA_B_expected) begin
+    	$display("Data Mismatch. Expected Out : %0b, Netlist: %0b, Time: %0t", RDATA_B_expected, RDATA_B, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected Out : %0b, Netlist: %0b, Time: %0t", RDATA_B_expected ,RDATA_B, $time);
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

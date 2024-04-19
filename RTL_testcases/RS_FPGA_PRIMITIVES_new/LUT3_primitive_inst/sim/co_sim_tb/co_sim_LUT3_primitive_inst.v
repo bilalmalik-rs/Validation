@@ -1,52 +1,60 @@
+ 
 module co_sim_LUT3_primitive_inst;
-    reg 		[2:0] 		A_LUT3;
-    wire 		Y_LUT3	,	Y_LUT3_netlist;
-	integer		mismatch	=	0;
+  reg [2:0] A_LUT3; // Data Input
+  wire Y_LUT3; // Data Output
 
-LUT3_primitive_inst	golden (.*);
 
 `ifdef PNR
-	LUT3_primitive_inst_post_route route_net (.*, .Y_LUT3(Y_LUT3_netlist) );
 `else
-	LUT3_primitive_inst_post_synth synth_net (.*, .Y_LUT3(Y_LUT3_netlist) );
+   	LUT3_primitive_inst DUT (.*);
 `endif
+integer mismatch=0;
 
-// Initialize values to zero 
-initial	begin
-	A_LUT3 <= 'd0;
-	#50;
-	compare();
-// Generating random stimulus 
-	for (int i = 0; i < 100; i = i + 1) begin
-		A_LUT3 <= $random();
-		#50;
-		compare();
-	end
-
-	// ----------- Corner Case stimulus generation -----------
-	A_LUT3 <= 7;
-	compare();
-	#50;
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+initial begin
+  A_LUT3 = 3'b000;
+  #5
+  compare;
+  A_LUT3 = 3'b001;
+  #5
+  compare;
+  A_LUT3 = 3'b010;
+  #5
+  compare;
+  A_LUT3 = 3'b011;
+  #5
+  compare;
+  A_LUT3 = 3'b100;
+  #5
+  compare;
+  A_LUT3 = 3'b101;
+  #5
+  compare;
+  A_LUT3 = 3'b110;
+  #5
+  compare;
+  A_LUT3 = 3'b111;
+  #5
+  compare;
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
+  $finish;
 end
 
-task compare();
-	if ( Y_LUT3 !== Y_LUT3_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, Netlist Output %0d, Time: %0t ", Y_LUT3, Y_LUT3_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, Netlist Output %0d, Time: %0t ", Y_LUT3, Y_LUT3_netlist,  $time);
+task compare;
+ 	
+  	if(Y_LUT3 !== (A_LUT3[2] + A_LUT3[1] + A_LUT3[0])) begin
+    	$display("Data Mismatch. Input : %0b, Actual Out: %0b, Time: %0t", (A_LUT3[2] + A_LUT3[1] + A_LUT3[0]), Y_LUT3, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Input : %0b, Actual Out: %0b, Time: %0t", (A_LUT3[2] + A_LUT3[1] + A_LUT3[0]) ,Y_LUT3, $time);
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

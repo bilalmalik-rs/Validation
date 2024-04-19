@@ -1,71 +1,69 @@
+ 
 module co_sim_dffnre_primitive_inst;
-// Clock signals
-    reg C;
-// Reset signals
-    reg R;
+  reg D;                // Data Input
+  reg R;                // Active-low, asynchronous reset
+  reg E;                // Active-high E
+  reg C;                // Negedge clock
+  wire Q;   // Data Output
 
-    reg 		D;
-    reg 		E;
-    wire 		Q	,	Q_netlist;
-	integer		mismatch	=	0;
+  reg expected_out;
+dffnre_primitive_inst DUT (.*);
 
-dffnre_primitive_inst	golden (.*);
+integer mismatch=0;
 
-`ifdef PNR
-	dffnre_primitive_inst_post_route route_net (.*, .Q(Q_netlist) );
-`else
-	dffnre_primitive_inst_post_synth synth_net (.*, .Q(Q_netlist) );
-`endif
-
-//clock initialization for C
-    initial begin
-        C = 1'b0;
-        forever #5 C = ~C;
-    end
-//Reset Stimulus generation
+always #5 C = ~C;
 initial begin
-	R <= 0;
-	@(negedge C);
-	{D, E } <= 'd0;
-	R <= 1;
-	@(negedge C);
-	$display ("***Reset Test is applied***");
-	@(negedge C);
-	@(negedge C);
-	compare();
-	$display ("***Reset Test is ended***");
-	//Random stimulus generation
-	repeat(100) @ (negedge C) begin
-		D 		 <= $random();
-		E 		 <= $random();
-		compare();
-end
-
-	// ----------- Corner Case stimulus generation -----------
-	D <= 1;
-	E <= 1;
-	compare();
-
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	repeat(50) @(posedge C);
+  C = 0;
+  R = 0;
+  E = 0;
+  D = 0;
+  repeat (5) @(posedge C);
+  R = 1;
+  compare;
+  repeat (5) @(posedge C);
+  E = 0;
+  D = 1;
+  compare;
+  @(posedge C);
+  E = 1;
+  D = 1;
+  compare;
+  @(posedge C);
+  E = 0;
+  D = 1;
+  compare;
+  @(posedge C);
+  R = 0;
+  E = 1;
+  D = 1;
+  compare;
+  repeat (5) @(posedge C);
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
+  $finish;
 end
 
-task compare();
-	if ( Q !== Q_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, Netlist Output %0d, Time: %0t ", Q, Q_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, Netlist Output %0d, Time: %0t ", Q, Q_netlist,  $time);
+  always @(negedge C, negedge R)
+    if (!R)
+      expected_out <= 1'b0;
+    else if (E)
+      expected_out <= D;
+
+task compare;
+ 	
+  	if(Q !== expected_out) begin
+    	$display("Data Mismatch. Expected out : %0b, Netlist: %0b, Time: %0t", expected_out, Q, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected out : %0b, Netlist: %0b, Time: %0t", expected_out ,Q, $time);
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

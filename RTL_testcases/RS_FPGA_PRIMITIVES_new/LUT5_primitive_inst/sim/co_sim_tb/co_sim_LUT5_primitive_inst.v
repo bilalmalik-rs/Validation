@@ -1,52 +1,40 @@
+ 
 module co_sim_LUT5_primitive_inst;
-    reg 		[4:0] 		A_LUT5;
-    wire 		Y_LUT5	,	Y_LUT5_netlist;
-	integer		mismatch	=	0;
-
-LUT5_primitive_inst	golden (.*);
+  reg [4:0] A_LUT5; // Data Input
+  wire Y_LUT5; // Data Output
 
 `ifdef PNR
-	LUT5_primitive_inst_post_route route_net (.*, .Y_LUT5(Y_LUT5_netlist) );
 `else
-	LUT5_primitive_inst_post_synth synth_net (.*, .Y_LUT5(Y_LUT5_netlist) );
+   	LUT5_primitive_inst DUT (.*);
 `endif
+integer mismatch=0,i;
 
-// Initialize values to zero 
-initial	begin
-	A_LUT5 <= 'd0;
-	#50;
-	compare();
-// Generating random stimulus 
-	for (int i = 0; i < 100; i = i + 1) begin
-		A_LUT5 <= $random();
-		#50;
-		compare();
-	end
-
-	// ----------- Corner Case stimulus generation -----------
-	A_LUT5 <= 31;
-	compare();
-	#50;
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+initial begin
+  for (i = 0 ; i<32 ; i=i+1) begin
+    A_LUT5 = i;
+    #5
+    compare;
+  end
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
+  $finish;
 end
 
-task compare();
-	if ( Y_LUT5 !== Y_LUT5_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, Netlist Output %0d, Time: %0t ", Y_LUT5, Y_LUT5_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, Netlist Output %0d, Time: %0t ", Y_LUT5, Y_LUT5_netlist,  $time);
+task compare;
+ 	
+  	if(Y_LUT5 !== (A_LUT5[4] + A_LUT5[3] + A_LUT5[2] + A_LUT5[1] + A_LUT5[0])) begin
+    	$display("Data Mismatch. Expected Out : %0b, Netlist: %0b, Time: %0t", (A_LUT5[4] + A_LUT5[3] + A_LUT5[2] + A_LUT5[1] + A_LUT5[0]), Y_LUT5, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected Out : %0b, Netlist: %0b, Time: %0t", (A_LUT5[4] + A_LUT5[3] + A_LUT5[2] + A_LUT5[1] + A_LUT5[0]) ,Y_LUT5, $time);
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

@@ -1,52 +1,40 @@
+ 
 module co_sim_LUT4_primitive_inst;
-    reg 		[3:0] 		A_LUT4;
-    wire 		Y_LUT4	,	Y_LUT4_netlist;
-	integer		mismatch	=	0;
-
-LUT4_primitive_inst	golden (.*);
+  reg [3:0] A_LUT4; // Data Input
+  wire Y_LUT4; // Data Output
 
 `ifdef PNR
-	LUT4_primitive_inst_post_route route_net (.*, .Y_LUT4(Y_LUT4_netlist) );
 `else
-	LUT4_primitive_inst_post_synth synth_net (.*, .Y_LUT4(Y_LUT4_netlist) );
+   	LUT4_primitive_inst DUT (.*);
 `endif
+integer mismatch=0,i;
 
-// Initialize values to zero 
-initial	begin
-	A_LUT4 <= 'd0;
-	#50;
-	compare();
-// Generating random stimulus 
-	for (int i = 0; i < 100; i = i + 1) begin
-		A_LUT4 <= $random();
-		#50;
-		compare();
-	end
-
-	// ----------- Corner Case stimulus generation -----------
-	A_LUT4 <= 15;
-	compare();
-	#50;
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+initial begin
+  for (i = 0 ; i<16 ; i=i+1) begin
+    A_LUT4 = i;
+    #5
+    compare;
+  end
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
+  $finish;
 end
 
-task compare();
-	if ( Y_LUT4 !== Y_LUT4_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, Netlist Output %0d, Time: %0t ", Y_LUT4, Y_LUT4_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, Netlist Output %0d, Time: %0t ", Y_LUT4, Y_LUT4_netlist,  $time);
+task compare;
+ 	
+  	if(Y_LUT4 !== (A_LUT4[3] + A_LUT4[2] + A_LUT4[1] + A_LUT4[0])) begin
+    	$display("Data Mismatch. Expected Out : %0b, Netlist: %0b, Time: %0t", (A_LUT4[3] + A_LUT4[2] + A_LUT4[1] + A_LUT4[0]), Y_LUT4, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected Out : %0b, Netlist: %0b, Time: %0t", (A_LUT4[3] + A_LUT4[2] + A_LUT4[1] + A_LUT4[0]) ,Y_LUT4, $time);
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

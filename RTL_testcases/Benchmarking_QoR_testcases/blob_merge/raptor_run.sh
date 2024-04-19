@@ -10,7 +10,7 @@ ip_name="" #design_level
 tool_name="iverilog" 
 
 #simulation stages
-post_synth_sim=true 
+post_synth_sim=false 
 post_route_sim=false 
 bitstream_sim=false
 
@@ -98,7 +98,7 @@ echo "Domain of the design: Unit Level Test">>results.log
 # Check if parameters were passed as command line arguments
 reg_id="23"
 timeout="90"
-synth_stage="1"
+synth_stage=""
 mute_flag=""
 if [[ $# -eq 6 ]]; then
   reg_id=$1

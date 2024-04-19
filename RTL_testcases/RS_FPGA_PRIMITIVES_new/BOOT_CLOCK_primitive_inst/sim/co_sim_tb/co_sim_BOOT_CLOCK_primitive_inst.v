@@ -1,61 +1,78 @@
+ 
 module co_sim_BOOT_CLOCK_primitive_inst;
-// Clock signals
-    reg clk1;
-    wire 		O_BOOT_CLOCK	,	O_BOOT_CLOCK_netlist;
-    reg 		async_signal;
-    wire 		sync_signal	,	sync_signal_netlist;
-	integer		mismatch	=	0;
+  reg clk1;       // Source clock domain clock
+  reg async_signal; // Asynchronous signal to be synchronized
+  wire sync_signal; // Synchronized signal
+  wire O_BOOT_CLOCK; // Clock output
 
-BOOT_CLOCK_primitive_inst	golden (.*);
+  reg sync_signal_expected;
+  reg expected_clk_output;
+  reg [1:0] sync_reg; // Two-stage synchronizer flip-flops
 
-`ifdef PNR
-	BOOT_CLOCK_primitive_inst_post_route route_net (.*, .O_BOOT_CLOCK(O_BOOT_CLOCK_netlist), .sync_signal(sync_signal_netlist) );
-`else
-	BOOT_CLOCK_primitive_inst_post_synth synth_net (.*, .O_BOOT_CLOCK(O_BOOT_CLOCK_netlist), .sync_signal(sync_signal_netlist) );
-`endif
+BOOT_CLOCK_primitive_inst DUT (.*);
 
-//clock initialization for clk1
-    initial begin
-        clk1 = 1'b0;
-        forever #5 clk1 = ~clk1;
-    end
-// Initialize values to zero 
-initial	begin
-	
-	async_signal <= 'd0;
-	 repeat (2) @ (negedge clk1); 
-	compare();
-	//Random stimulus generation
-	repeat(100) @ (negedge clk1) begin
-		async_signal <= $random();
+integer mismatch=0;
 
-		compare();
-	end
+// Clock generation for clk1
+initial begin
+    clk1 = 0;
+    forever #7.5 clk1 = ~clk1; // Generate clk1 with a period of 15ns
+end
 
-	// ----------- Corner Case stimulus generation -----------
-	async_signal <= 1;
-	repeat (2) @ (negedge clk1);
-	compare();
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+initial begin
+  // Initialize inputs
+  async_signal = 0;
+  expected_clk_output = 0;
+
+  // Delay to let the simulation stabilize
+  #10;
+
+  // Start comparing expected output with actual output from DUT
+  async_signal = 1;
+  #15 compare;
+   async_signal = 0;
+  #15 compare;
+   async_signal = 1;
+  #15 compare;
+
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-task compare();
-	if ( O_BOOT_CLOCK !== O_BOOT_CLOCK_netlist	||	sync_signal !== sync_signal_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", O_BOOT_CLOCK, sync_signal, O_BOOT_CLOCK_netlist, sync_signal_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", O_BOOT_CLOCK, sync_signal, O_BOOT_CLOCK_netlist, sync_signal_netlist,  $time);
+localparam HALF_PERIOD = 30/2.0;
+ always #HALF_PERIOD expected_clk_output <= ~expected_clk_output;
+ always @(posedge clk1) begin    // Capture input on source clock domain
+    sync_reg[0] <= async_signal;
+  end
+
+  always @(posedge expected_clk_output) begin    // Release synchronized signal on destination clock domain
+    sync_signal_expected <= sync_reg[1];
+    sync_reg[1] <= sync_reg[0];
+  end
+
+task compare;
+ 	
+  	if(O_BOOT_CLOCK !== expected_clk_output) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", expected_clk_output, O_BOOT_CLOCK, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", expected_clk_output ,O_BOOT_CLOCK, $time);
+
+    if(sync_signal !== sync_signal_expected) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", sync_signal_expected, sync_signal, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", sync_signal_expected ,sync_signal, $time);
+
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

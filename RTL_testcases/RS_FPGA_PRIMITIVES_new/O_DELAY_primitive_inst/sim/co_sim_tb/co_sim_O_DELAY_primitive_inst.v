@@ -1,72 +1,92 @@
+ 
+ 
 module co_sim_O_DELAY_primitive_inst;
-// Clock signals
-    reg CLK_IN;
-    wire 		[5:0] 		DLY_TAP_VALUE	,	DLY_TAP_VALUE_netlist;
-    reg 		DLY_ADJ;
-    reg 		DLY_INCDEC;
-    reg 		DLY_LOAD;
-    wire 		O	,	O_netlist;
-    reg 		in;
-    reg 		reset;
-	integer		mismatch	=	0;
+  reg I; // Data Input (Connect to input port or buffer)
+  reg DLY_LOAD; // Delay load input
+  reg DLY_ADJ; // Delay adjust input
+  reg DLY_INCDEC; // Delay increment / decrement input
+  wire [5:0] DLY_TAP_VALUE; // Delay tap value output
+  reg CLK_IN; // Clock input
+  wire O; // Data output
 
-O_DELAY_primitive_inst	golden (.*);
+  reg expected_data_output, expected_tap_delay;
+O_DELAY_primitive_inst DUT (.*);
 
-`ifdef PNR
-	O_DELAY_primitive_inst_post_route route_net (.*, .DLY_TAP_VALUE(DLY_TAP_VALUE_netlist), .O(O_netlist) );
-`else
-	O_DELAY_primitive_inst_post_synth synth_net (.*, .DLY_TAP_VALUE(DLY_TAP_VALUE_netlist), .O(O_netlist) );
-`endif
-
-//clock initialization for CLK_IN
-    initial begin
-        CLK_IN = 1'b0;
-        forever #5 CLK_IN = ~CLK_IN;
-    end
-// Initialize values to zero 
-initial	begin
-	{DLY_ADJ, DLY_INCDEC, DLY_LOAD, in, reset } <= 'd0;
-	 repeat (2) @ (negedge CLK_IN); 
-	compare();
-	//Random stimulus generation
-	repeat(100) @ (negedge CLK_IN) begin
-		DLY_ADJ <= $random();
-		DLY_INCDEC <= $random();
-		DLY_LOAD <= $random();
-		in <= $random();
-		reset <= $random();
-
-		compare();
-	end
-
-	// ----------- Corner Case stimulus generation -----------
-	DLY_ADJ <= 1;
-	DLY_INCDEC <= 1;
-	DLY_LOAD <= 1;
-	in <= 1;
-	reset <= 1;
-	repeat (2) @ (negedge CLK_IN);
-	compare();
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	#50;
+integer mismatch=0,i;
+always #10 CLK_IN = ~CLK_IN;
+initial begin
+  CLK_IN = 0;
+  for (i=0; i<16; i=i+1) begin
+    {I, DLY_LOAD , DLY_ADJ, DLY_INCDEC} = i;
+    @(negedge CLK_IN);
+    compare;
+  end
+  
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-task compare();
-	if ( DLY_TAP_VALUE !== DLY_TAP_VALUE_netlist	||	O !== O_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", DLY_TAP_VALUE, O, DLY_TAP_VALUE_netlist, O_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", DLY_TAP_VALUE, O, DLY_TAP_VALUE_netlist, O_netlist,  $time);
+///model////
+// Adding local variable for delay load
+reg dly_ld_0, dly_ld_1;
+wire dly_ld_p;
+
+// Adding local variable for delay adjust
+reg dly_adj_0, dly_adj_1;
+wire dly_adj_p;
+
+// reg counter;
+reg [5:0] dly_tap_val = 0;
+  
+always_ff @(posedge CLK_IN) 
+begin
+	dly_ld_0 <= DLY_LOAD;
+	dly_ld_1 <= dly_ld_0;
+	
+	dly_adj_0 <= DLY_ADJ;
+	dly_adj_1 <= dly_adj_0;
+end
+
+// Detecting 0 to 1 transition
+assign dly_ld_p = dly_ld_0 && !dly_ld_1;
+assign dly_adj_p = dly_adj_0 && !dly_adj_1;
+
+always_ff @(posedge CLK_IN) 
+begin
+	if (dly_ld_p)
+		dly_tap_val <= DELAY;
+	else if (dly_adj_p && DLY_INCDEC && dly_tap_val!=63) 
+		dly_tap_val <= dly_tap_val + 1;
+	else if (dly_adj_p && !DLY_INCDEC && dly_tap_val!=0) 
+		dly_tap_val <= dly_tap_val - 1;
+end
+
+assign expected_tap_delay = dly_tap_val;
+assign #(30.0 + (21.56*dly_tap_val)) expected_data_output = I;			// Adjusted Delay for TT corner
+
+task compare;
+ 	
+  if(O !== expected_data_output) begin
+    $display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output, O, $time);
+    mismatch = mismatch+1;
+  end
+  else
+    $display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", expected_data_output ,O, $time);
+
+  if(DLY_TAP_VALUE !== expected_tap_delay) begin
+    $display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", expected_tap_delay, DLY_TAP_VALUE, $time);
+    mismatch = mismatch+1;
+  end
+  else
+    $display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", expected_tap_delay ,DLY_TAP_VALUE, $time);
+
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule

@@ -1,69 +1,51 @@
+ 
 module co_sim_o_buf_ds_primitive_inst;
-// Clock signals
-    reg clk;
-// Reset signals
-    reg rst;
+  reg I_O_BUF_DS; // Data input
+  wire O_P_O_BUF_DS; // Data positive output (connect to top-level port)
+  wire O_N_O_BUF_DS ;
 
-    reg 		[7:0] 		parallel_in;
-    wire 		O_N_O_BUF_DS	,	O_N_O_BUF_DS_netlist;
-    wire 		O_P_O_BUF_DS	,	O_P_O_BUF_DS_netlist;
-	integer		mismatch	=	0;
+  wire O_P_expected, O_N_expected;
+o_buf_ds_primitive_inst DUT (.*);
 
-o_buf_ds_primitive_inst	golden (.*);
+integer mismatch=0;
 
-`ifdef PNR
-	o_buf_ds_primitive_inst_post_route route_net (.*, .O_N_O_BUF_DS(O_N_O_BUF_DS_netlist), .O_P_O_BUF_DS(O_P_O_BUF_DS_netlist) );
-`else
-	o_buf_ds_primitive_inst_post_synth synth_net (.*, .O_N_O_BUF_DS(O_N_O_BUF_DS_netlist), .O_P_O_BUF_DS(O_P_O_BUF_DS_netlist) );
-`endif
-
-//clock initialization for clk
-    initial begin
-        clk = 1'b0;
-        forever #5 clk = ~clk;
-    end
-//Reset Stimulus generation
 initial begin
-	rst <= 0;
-	@(negedge clk);
-	{parallel_in } <= 'd0;
-	rst <= 1;
-	@(negedge clk);
-	$display ("***Reset Test is applied***");
-	@(negedge clk);
-	@(negedge clk);
-	compare();
-	$display ("***Reset Test is ended***");
-	//Random stimulus generation
-	repeat(100) @ (negedge clk) begin
-		parallel_in 		 <= $random();
-		compare();
-end
-
-	// ----------- Corner Case stimulus generation -----------
-	parallel_in <= 255;
-	compare();
-
-	if(mismatch == 0)
-		$display("**** All Comparison Matched *** \n		Simulation Passed\n");
-	else
-		$display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
-	repeat(50) @(posedge clk);
+  {I_O_BUF_DS} = 1'b0;
+  #5
+  compare;
+  {I_O_BUF_DS} = 1'b1;
+  #5
+  compare;
+  if(mismatch == 0)
+        $display("\n**** All Comparison Matched ***\nSimulation Passed");
+    else
+        $display("%0d comparison(s) mismatched\nERROR: SIM: Simulation Failed", mismatch);
 	$finish;
 end
 
-task compare();
-	if ( O_N_O_BUF_DS !== O_N_O_BUF_DS_netlist	||	O_P_O_BUF_DS !== O_P_O_BUF_DS_netlist ) begin
-		$display("Data Mismatch: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", O_N_O_BUF_DS, O_P_O_BUF_DS, O_N_O_BUF_DS_netlist, O_P_O_BUF_DS_netlist,  $time);
-		mismatch = mismatch+1;
-	end
-	else
-		$display("Data Matched: Actual output: %0d, %0d, Netlist Output %0d, %0d, Time: %0t ", O_N_O_BUF_DS, O_P_O_BUF_DS, O_N_O_BUF_DS_netlist, O_P_O_BUF_DS_netlist,  $time);
+    assign O_P_expected = I_O_BUF_DS;
+    assign O_N_expected = ~I_O_BUF_DS;
+
+task compare;
+ 	
+  	if(O_P_O_BUF_DS !== O_P_expected) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", O_P_expected, O_P_O_BUF_DS, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", O_P_expected ,O_P_O_BUF_DS, $time);
+    
+    if(O_N_O_BUF_DS !== O_N_expected) begin
+    	$display("Data Mismatch. Expected : %0b, Actual: %0b, Time: %0t", O_N_expected, O_N_O_BUF_DS, $time);
+    	mismatch = mismatch+1;
+ 	end
+  	else
+  		$display("Data Matched. Expected : %0b, Actual: %0b, Time: %0t", O_N_expected ,O_N_O_BUF_DS, $time);
+
 endtask
 
 initial begin
-	$dumpfile("tb.vcd");
-	$dumpvars;
+    $dumpfile("tb.vcd");
+    $dumpvars;
 end
-
 endmodule
